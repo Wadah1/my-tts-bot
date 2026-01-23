@@ -1,57 +1,55 @@
 import os
 import asyncio
-from gtts import gTTS
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import edge_tts
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-# --- ربط التوكن الخاص بك مباشرة ---
+# التوكن الخاص بك
 TOKEN = "7857085752:AAE6XUInKJ-SpFkVxHhYDiI2RUKcs0DiwRo"
 
-# دالة الترحيب عند تشغيل البوت /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "أهلاً بك! أنا بوت تحويل النص إلى كلام. 🎙️\n"
-        "أرسل لي أي نص وسأقوم بتحويله إلى مقطع صوتي فوراً."
-    )
+    await update.message.reply_text("مرحباً! أرسل لي النص وسأقوم بتحويله لصوت احترافي.")
 
-# دالة معالجة النصوص وتحويلها لصوت
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
-    chat_id = update.message.chat_id
+    context.user_data['text_to_say'] = user_text
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("🇸🇦 حمد (رجل)", callback_query_data='ar-SA-HamedNeural'),
+            InlineKeyboardButton("🇸🇦 زارينا (امرأة)", callback_query_data='ar-SA-ZariinaNeural'),
+        ],
+        [
+            InlineKeyboardButton("🇪🇬 سلمى (امرأة)", callback_query_data='ar-EG-SalmaNeural'),
+            InlineKeyboardButton("🇮🇶 باسل (رجل)", callback_query_data='ar-IQ-BasselNeural'),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("اختر الصوت المناسب:", reply_markup=reply_markup)
 
-    # إظهار حالة "يرسل ملفاً صوتياً" للمستخدم
-    await context.bot.send_chat_action(chat_id=chat_id, action="record_voice")
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    voice = query.data
+    text = context.user_data.get('text_to_say', '')
+    
+    await query.edit_message_text("⏳ جاري إنشاء الصوت...")
+    file_path = f"voice_{query.from_user.id}.mp3"
+    
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(file_path)
 
-    try:
-        # 1. تحويل النص إلى كلام باستخدام gTTS (يدعم العربية)
-        tts = gTTS(text=user_text, lang='ar', slow=False)
-        
-        # 2. حفظ الملف مؤقتاً بصيغة mp3
-        file_name = f"voice_{chat_id}.mp3"
-        tts.save(file_name)
+    with open(file_path, 'rb') as audio:
+        await context.bot.send_voice(chat_id=query.message.chat_id, voice=audio)
+    
+    await query.delete_message()
+    if os.path.exists(file_path): os.remove(file_path)
 
-        # 3. إرسال الملف الصوتي للمستخدم
-        with open(file_name, 'rb') as audio:
-            await update.message.reply_voice(voice=audio)
-
-        # 4. حذف الملف من السيرفر بعد الإرسال لتوفير المساحة
-        if os.path.exists(file_name):
-            os.remove(file_name)
-
-    except Exception as e:
-        await update.message.reply_text(f"عذراً، حدث خطأ أثناء المعالجة: {e}")
-
-# التشغيل الأساسي للبوت
 def main():
-    # إنشاء التطبيق وربطه بالتوكن
-    application = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CallbackQueryHandler(button_callback))
+    app.run_polling()
 
-    # إضافة الأوامر والمستقبلات
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    print("البوت يعمل الآن... اذهب إلى تلغرام وجربه!")
-    application.run_polling()
-
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()
