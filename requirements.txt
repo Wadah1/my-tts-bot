@@ -1,2 +1,2 @@
 python-telegram-bot
-edge_tts
+​edge-tts
