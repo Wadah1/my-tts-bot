@@ -16,12 +16,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [
-            InlineKeyboardButton("🇸🇦 حمد (رجل)", callback_query_data='ar-SA-HamedNeural'),
-            InlineKeyboardButton("🇸🇦 زارينا (امرأة)", callback_query_data='ar-SA-ZariinaNeural'),
+            InlineKeyboardButton("🇸🇦 حمد (رجل)", callback_data='ar-SA-HamedNeural'),
+            InlineKeyboardButton("🇸🇦 زارينا (امرأة)", callback_data='ar-SA-ZariinaNeural'),
         ],
         [
-            InlineKeyboardButton("🇪🇬 سلمى (امرأة)", callback_query_data='ar-EG-SalmaNeural'),
-            InlineKeyboardButton("🇮🇶 باسل (رجل)", callback_query_data='ar-IQ-BasselNeural'),
+            InlineKeyboardButton("🇪🇬 سلمى (امرأة)", callback_data='ar-EG-SalmaNeural'),
+            InlineKeyboardButton("🇮🇶 باسل (رجل)", callback_data='ar-IQ-BasselNeural'),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
