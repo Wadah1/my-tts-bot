@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = "7857085752:AAE6XUInKJ-SpFkVxHhYDiI2RUKcs0DiwRo"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مرحباً بك! أرسل لي النص وسأحوله لصوت هادئ وواضح.")
+    await update.message.reply_text("مرحباً! أرسل لي النص وسأقوم بتحويله لصوت هادئ وواضح.")
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
@@ -25,7 +25,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("اختر الصوت المناسب (تم تحسين السرعة):", reply_markup=reply_markup)
+    await update.message.reply_text("اختر الصوت (تم ضبط السرعة لتكون طبيعية):", reply_markup=reply_markup)
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -36,9 +36,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("⏳ جاري إنشاء الصوت بنبرة طبيعية...")
     file_path = f"voice_{query.from_user.id}.mp3"
     
-    # هنا التعديل: جعلنا السرعة -10% ليكون الصوت أهدأ وأوضح
-    # يمكنك تغيير -10% إلى -20% إذا أردته أبطأ أكثر
-    communicate = edge_tts.Communicate(text, voice, rate="-10%")
+    # تم ضبط السرعة (rate) إلى -15% لجعل الصوت أوضح وأبطأ قليلًا
+    communicate = edge_tts.Communicate(text, voice, rate="-15%")
     await communicate.save(file_path)
 
     with open(file_path, 'rb') as audio:
