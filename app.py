@@ -10,7 +10,7 @@ from bidi.algorithm import get_display
 # أمر حيوي لحل مشكلة السيرفر
 change_settings({"IMAGEMAGICK_BINARY": "/usr/bin/convert"})
 
-TOKEN = "7857085752:AAE6XUInKJ-SpFkVxHhYDiI2RUKcs0DiwRo"
+TOKEN = "8467711253:AAGDIKhqHjcLn5zDAd_8JrPppDQysecYjZU"
 bot = telebot.TeleBot(TOKEN)
 
 def fix_arabic(text):
@@ -87,3 +87,4 @@ def make_video(call):
         bot.send_message(chat_id, f"❌ خطأ: تأكد من ملف packages.txt وكتابة كلمة imagemagick فيه.")
 
 bot.infinity_polling()
+
