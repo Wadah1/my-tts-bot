@@ -1,2 +1,5 @@
-python-telegram-bot
-edge-tts
+pyTelegramBotAPI
+moviepy
+requests
+arabic-reshaper
+python-bidi
