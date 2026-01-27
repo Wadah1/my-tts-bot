@@ -11,7 +11,7 @@ user_data = {}
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "📸 أهلاً بك! أرسل **الصورة** أولاً لتكون خلفية للفيديو.")
+    bot.send_message(message.chat.id, "📸 أهلاً بك في @NameRefuserBot\nأرسل **الصورة** التي تريدها كخلفية أولاً.")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
@@ -26,7 +26,7 @@ def handle_photo(message):
     qaris = {"المنشاوي": "ar.minshawi", "العفاسي": "ar.alafasy", "عبدالباسط": "ar.abdulsamad"}
     for name, code in qaris.items():
         markup.add(types.InlineKeyboardButton(name, callback_data=f"q_{code}"))
-    bot.send_message(chat_id, "✅ الصورة جاهزة! اختر القارئ:", reply_markup=markup)
+    bot.send_message(chat_id, "✅ تم حفظ الصورة! اختر القارئ:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('q_'))
 def select_qari(call):
@@ -36,7 +36,7 @@ def select_qari(call):
     markup = types.InlineKeyboardMarkup()
     for name, code in surahs_list.items():
         markup.add(types.InlineKeyboardButton(name, callback_data=f"s_{code}"))
-    bot.edit_message_text("📖 اختر الآية الآن:", call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.edit_message_text("📖 اختر الآية الآن لتوليد الفيديو:", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('s_'))
 def make_video(call):
@@ -48,6 +48,7 @@ def make_video(call):
     bot.send_message(chat_id, "⏳ جاري دمج الصوت مع صورتك... انتظر قليلاً")
 
     try:
+        # جلب البيانات
         res = requests.get(f"https://api.alquran.cloud/v1/ayah/{surah}:{ayah}/{data['qari']}").json()
         ayah_text = res['data']['text']
         audio_url = res['data']['audio']
@@ -55,19 +56,20 @@ def make_video(call):
         audio_path = f"a_{chat_id}.mp3"
         with open(audio_path, "wb") as f: f.write(requests.get(audio_url).content)
         
-        # إنشاء الفيديو بالصوت والصورة فقط (لتجنب خطأ ImageMagick)
+        # إنشاء الفيديو بالصوت والصورة فقط لضمان التشغيل 100%
         audio = AudioFileClip(audio_path)
         img = ImageClip(data['image']).set_duration(audio.duration).resize(width=1080)
         
         out = f"v_{chat_id}.mp4"
-        img.set_audio(audio).write_videofile(out, fps=10, codec="libx264")
+        img.set_audio(audio).write_videofile(out, fps=12, codec="libx264", audio_codec="aac")
 
+        # إرسال الفيديو مع النص في الكابشن
         with open(out, 'rb') as v:
-            bot.send_video(chat_id, v, caption=f"✨ {ayah_text}\n\nتم بواسطة @NameRefuserBot")
+            bot.send_video(chat_id, v, caption=f"📖 {ayah_text}\n\nتم بواسطة @NameRefuserBot ✨")
         
         os.remove(audio_path)
         os.remove(out)
     except:
-        bot.send_message(chat_id, "❌ حدث خطأ، يرجى إعادة المحاولة.")
+        bot.send_message(chat_id, "❌ حدث خطأ، تأكد من تحديث صفحة Hugging Face.")
 
 bot.infinity_polling()
