@@ -22,20 +22,20 @@ def fix_arabic(text):
 user_data = {}
 
 # قائمة القراء
-qaris = {"المنشاوي": "ar.minshawi", "العفاسي": "ar.alafasy", "عبدالباسط": "ar.abdulsamad"}
+qaris = {"الشيخ المنشاوي": "ar.minshawi", "الشيخ العفاسي": "ar.alafasy", "الشيخ عبدالباسط": "ar.abdulsamad"}
 
-# قائمة السور المختارة (يمكنك زيادتها لاحقاً)
+# قائمة السور (أزرار)
 surahs_list = {
-    "الفاتحة": "1",
-    "الإخلاص": "112",
-    "الفلق": "113",
-    "الناس": "114",
-    "الكرسي (آية)": "2:255"
+    "سورة الفاتحة": "1:1",
+    "سورة الإخلاص": "112:1",
+    "سورة الفلق": "113:1",
+    "سورة الناس": "114:1",
+    "آية الكرسي": "2:255"
 }
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "📸 أهلاً بك في بوت @NameRefuserBot\n\nمن فضلك **أرسل الصورة** التي تريدها كخلفية أولاً.")
+    bot.send_message(message.chat.id, "📸 أهلاً بك! من فضلك **أرسل الصورة** التي تريد تصميم الفيديو عليها أولاً.")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
@@ -49,12 +49,12 @@ def handle_photo(message):
     
     user_data[chat_id] = {'image': img_path}
     
-    # إنشاء أزرار القراء
+    # إظهار أزرار القراء فوراً بعد الصورة
     markup = types.InlineKeyboardMarkup()
     for name, code in qaris.items():
         markup.add(types.InlineKeyboardButton(name, callback_data=f"q_{code}"))
     
-    bot.send_message(chat_id, "✅ تم حفظ الصورة! اختر الآن القارئ:", reply_markup=markup)
+    bot.send_message(chat_id, "✅ تم حفظ صورتك بنجاح!\nالآن **اختر القارئ** من القائمة:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('q_'))
 def select_qari(call):
@@ -62,43 +62,40 @@ def select_qari(call):
     user_data[chat_id]['qari'] = call.data.split('_')[1]
     bot.answer_callback_query(call.id)
     
-    # إنشاء أزرار السور
+    # إظهار أزرار السور
     markup = types.InlineKeyboardMarkup()
     for name, code in surahs_list.items():
         markup.add(types.InlineKeyboardButton(name, callback_data=f"s_{code}"))
     
-    bot.edit_message_text("📖 الآن اختر السورة أو الآية من القائمة:", chat_id, call.message.message_id, reply_markup=markup)
+    bot.edit_message_text("📖 ممتاز! الآن **اختر السورة أو الآية** التي تريدها:", chat_id, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('s_'))
-def process_video_step(call):
+def process_video_final(call):
     chat_id = call.message.chat.id
     selection = call.data.split('_')[1]
     bot.answer_callback_query(call.id)
     
-    # تحديد السورة والآية
-    if ":" in selection:
-        surah, ayah = selection.split(':')
-    else:
-        surah, ayah = selection, "1" # الافتراضي الآية الأولى
-
+    surah, ayah = selection.split(':')
     data = user_data[chat_id]
-    bot.send_message(chat_id, "⏳ جاري إنتاج الفيديو الخاص بك... انتظر قليلاً")
+    
+    msg = bot.send_message(chat_id, "⏳ جاري إنتاج الفيديو... قد يستغرق الأمر دقيقة واحدة.")
 
     try:
-        # جلب البيانات
+        # جلب البيانات من API القرآن
         res = requests.get(f"https://api.alquran.cloud/v1/ayah/{surah}:{ayah}/{data['qari']}").json()
         ayah_text = res['data']['text']
         audio_url = res['data']['audio']
 
-        # تحميل الصوت
+        # تحميل الملف الصوتي
         audio_path = f"audio_{chat_id}.mp3"
         with open(audio_path, "wb") as f:
             f.write(requests.get(audio_url).content)
         
+        # المونتاج
         audio = AudioFileClip(audio_path)
         img = ImageClip(data['image']).set_duration(audio.duration).resize(width=1080)
         
-        txt = TextClip(fix_arabic(ayah_text), fontsize=60, color='white', font='Arial', 
+        txt = TextClip(fix_arabic(ayah_text), fontsize=65, color='white', font='Arial', 
                        method='caption', size=(img.w*0.8, None))
         txt = txt.set_duration(audio.duration).set_position('center')
 
@@ -106,12 +103,14 @@ def process_video_step(call):
         out_file = f"video_{chat_id}.mp4"
         final.write_videofile(out_file, fps=10, codec="libx264")
 
+        # إرسال الفيديو
         with open(out_file, 'rb') as v:
             bot.send_video(chat_id, v, caption="تم التصميم بواسطة @NameRefuserBot ✨")
         
+        # تنظيف الملفات
         os.remove(audio_path)
         os.remove(out_file)
     except Exception as e:
-        bot.send_message(chat_id, "❌ حدث خطأ أثناء المعالجة، حاول مرة أخرى.")
+        bot.send_message(chat_id, "❌ حدث خطأ، تأكد من أن السيرفر يدعم ImageMagick.")
 
 bot.infinity_polling()
