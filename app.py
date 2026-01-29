@@ -1,100 +1,84 @@
-import telebot
-from telebot import types
-import requests
 import os
-import time
-from moviepy.editor import ImageClip, AudioFileClip
+import requests
+import subprocess
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TOKEN = "7857085752:AAE6XUInKJ-SpFkVxHhYDiI2RUKcs0DiwRo"
-bot = telebot.TeleBot(TOKEN)
+BOT_TOKEN = os.getenv("8467711253:AAGDIKhqHjcLn5zDAd_8JrPppDQysecYjZU")
 
-user_files = {}
+# تحميل صورة طبيعة
+def download_nature_image():
+    url = "https://source.unsplash.com/1080x1920/?nature"
+    img_path = "bg.jpg"
+    with open(img_path, "wb") as f:
+        f.write(requests.get(url).content)
+    return img_path
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(message.chat.id, "📸 أرسل الصورة أولاً (خلفية الفيديو).")
+# تحميل صوت التلاوة
+def download_audio(audio_url):
+    audio_path = "audio.mp3"
+    with open(audio_path, "wb") as f:
+        f.write(requests.get(audio_url).content)
+    return audio_path
 
-@bot.message_handler(content_types=['photo'])
-def handle_photo(message):
-    chat_id = message.chat.id
-    file_info = bot.get_file(message.photo[-1].file_id)
-    downloaded_file = bot.download_file(file_info.file_path)
-    
-    img_path = f"img_{chat_id}.jpg"
-    # مسح أي ملف قديم بنفس الاسم لتوفير المساحة
-    if os.path.exists(img_path): os.remove(img_path)
-    
-    with open(img_path, 'wb') as f:
-        f.write(downloaded_file)
-    
-    user_files[chat_id] = {'img': img_path}
-    
-    markup = types.InlineKeyboardMarkup()
-    qaris = {"المنشاوي": "ar.minshawi", "العفاسي": "ar.alafasy", "عبدالباسط": "ar.abdulsamad"}
-    for name, code in qaris.items():
-        markup.add(types.InlineKeyboardButton(name, callback_data=f"q_{code}"))
-    bot.send_message(chat_id, "✅ تم حفظ الصورة! اختر القارئ:", reply_markup=markup)
+# إنشاء الفيديو
+def create_video(image, audio, text):
+    video_path = "output.mp4"
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('q_'))
-def select_qari(call):
-    chat_id = call.message.chat.id
-    if chat_id not in user_files:
-        bot.send_message(chat_id, "⚠️ أرسل الصورة مرة أخرى.")
-        return
-    user_files[chat_id]['qari'] = call.data.split('_')[1]
-    bot.answer_callback_query(call.id)
-    surahs = {"الفاتحة": "1:1", "الإخلاص": "112:1", "الفلق": "113:1", "الناس": "114:1", "الكرسي": "2:255"}
-    markup = types.InlineKeyboardMarkup()
-    for name, code in surahs.items():
-        markup.add(types.InlineKeyboardButton(name, callback_data=f"s_{code}"))
-    bot.edit_message_text("📖 اختر الآية الآن:", chat_id, call.message.message_id, reply_markup=markup)
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-loop", "1",
+        "-i", image,
+        "-i", audio,
+        "-c:v", "libx264",
+        "-tune", "stillimage",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-shortest",
+        "-vf",
+        f"scale=1080:1920,drawtext=text='{text}':fontcolor=white:fontsize=48:box=1:boxcolor=black@0.5:boxborderw=20:x=(w-text_w)/2:y=h-300",
+        video_path
+    ]
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('s_'))
-def make_video(call):
-    chat_id = call.message.chat.id
-    if chat_id not in user_files: return
+    subprocess.run(cmd, check=True)
+    return video_path
 
-    selection = call.data.split('_')[1]
-    surah, ayah = selection.split(':')
-    data = user_files[chat_id]
-    
-    status_msg = bot.send_message(chat_id, "⏳ جاري بدء المونتاج (صورة + صوت)...")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📖 بوت فيديوهات القرآن\n\n"
+        "استخدم:\n"
+        "/ayah رقم_السورة رقم_الآية\n\n"
+        "مثال:\n"
+        "/ayah 1 1"
+    )
 
+async def ayah(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        # جلب البيانات
-        res = requests.get(f"https://api.alquran.cloud/v1/ayah/{surah}:{ayah}/{data['qari']}").json()
-        audio_url = res['data']['audio']
-        ayah_text = res['data']['text']
-        
-        audio_path = f"aud_{chat_id}.mp3"
-        output_v = f"vid_{chat_id}.mp4"
+        surah = context.args[0]
+        ayah = context.args[1]
 
-        # تنظيف قبل البدء
-        for f in [audio_path, output_v]:
-            if os.path.exists(f): os.remove(f)
+        api = f"https://api.alquran.cloud/v1/ayah/{surah}:{ayah}/ar.alafasy"
+        data = requests.get(api).json()["data"]
 
-        # تحميل الصوت
-        audio_data = requests.get(audio_url).content
-        with open(audio_path, "wb") as f: f.write(audio_data)
+        text = data["text"].replace("'", "")
+        audio_url = data["audio"]
 
-        # معالجة الفيديو
-        audio_clip = AudioFileClip(audio_path)
-        video_clip = ImageClip(data['img']).set_duration(audio_clip.duration)
-        video_clip = video_clip.set_audio(audio_clip)
-        
-        # استخدام إعدادات خفيفة جداً لضمان النجاح
-        video_clip.write_videofile(output_v, fps=5, codec="libx264", audio_codec="libmp3lame", preset="ultrafast")
+        await update.message.reply_text("⏳ جاري إنشاء الفيديو...")
 
-        with open(output_v, 'rb') as v:
-            bot.send_video(chat_id, v, caption=f"📖 {ayah_text}\n\nتم بواسطة @NameRefuserBot")
+        image = download_nature_image()
+        audio = download_audio(audio_url)
+        video = create_video(image, audio, text)
 
-        # تنظيف نهائي
-        audio_clip.close()
-        video_clip.close()
-        os.remove(audio_path)
-        os.remove(output_v)
-        
+        await update.message.reply_video(video=open(video, "rb"))
+
     except Exception as e:
-        bot.send_message(chat_id, f"❌ فشل المونتاج. السبب التقني: {str(e)[:100]}")
+        await update.message.reply_text("❌ حدث خطأ، تأكد من الأمر")
+        print(e)
 
-bot.infinity_polling()
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ayah", ayah))
+    app.run_polling()
