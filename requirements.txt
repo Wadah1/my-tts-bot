@@ -1,5 +1,2 @@
-pyTelegramBotAPI
-moviepy==1.0.3
+python-telegram-bot==20.6
 requests
-arabic-reshaper
-python-bidi
