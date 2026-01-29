@@ -1,3 +1,2 @@
-ffmpeg
-libsm6
-libxext6
+python-telegram-bot==20.6
+requests
